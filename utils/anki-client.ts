@@ -13,7 +13,7 @@ export const invokeAnki = async <T>(action: string, params: any = {}, baseUrl: s
         });
         const json: AnkiResponse<T> = await response.json();
         if (json.error) {
-            throw new Error(json.error);
+            throw new Error(String(json.error));
         }
         return json.result;
     } catch (e: any) {
@@ -62,6 +62,11 @@ img { max-width: 100%; }
             }
         ]
     }, baseUrl);
+};
+
+export const canAddNotes = async (notes: any[], baseUrl: string) => {
+    // Returns an array of booleans indicating if each note can be added (is not duplicate)
+    return invokeAnki<boolean[]>('canAddNotes', { notes }, baseUrl);
 };
 
 export const addNotesToAnki = async (notes: any[], baseUrl: string) => {

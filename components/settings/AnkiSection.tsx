@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { AnkiConfig, WordEntry, WordCategory } from '../../types';
 import { RefreshCw, Wifi, Info, PlusCircle, ChevronDown, Layers, Calendar, Code, Eye, BookOpen, X, Copy } from 'lucide-react';
-import { pingAnki, addNotesToAnki, getCardsInfo, getModelNames, createModel, createDeck, getDeckNames } from '../../utils/anki-client';
+import { pingAnki, addNotesToAnki, getCardsInfo, getModelNames, createModel, createDeck, getDeckNames, canAddNotes } from '../../utils/anki-client';
 import { Toast, ToastMessage } from '../ui/Toast';
 
 const Tooltip: React.FC<{ text: string; children: React.ReactNode }> = ({ text, children }) => {
@@ -206,27 +206,24 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
           // 2. Check and Create Model/Deck if needed
           const TARGET_MODEL_NAME = "ContextLingo-Basic";
           
-          // 并行获取模型和牌组列表，检查是否存在
           const [existingModels, existingDecks] = await Promise.all([
               getModelNames(config.url),
               getDeckNames(config.url)
           ]);
 
-          // 如果模型不存在，则创建
           if (!existingModels.includes(TARGET_MODEL_NAME)) {
               await createModel(TARGET_MODEL_NAME, config.url);
               setConfig(prev => ({ ...prev, modelName: TARGET_MODEL_NAME }));
           }
 
-          // 如果牌组不存在，则创建 (修复: 无论模型是否存在，都要检查牌组)
           if (!existingDecks.includes(config.deckName)) {
               await createDeck(config.deckName, config.url);
           }
 
-          // 3. Create Notes
-          const notes = wordsToAdd.map(entry => ({
+          // 3. Create Note Objects
+          const notesPayload = wordsToAdd.map(entry => ({
               deckName: config.deckName,
-              modelName: TARGET_MODEL_NAME, // Use our dedicated model
+              modelName: TARGET_MODEL_NAME, 
               fields: {
                   Front: generateCardContent(entry, config.templates.frontTemplate),
                   Back: generateCardContent(entry, config.templates.backTemplate)
@@ -235,13 +232,25 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
               options: { allowDuplicate: false, duplicateScope: "deck" }
           }));
 
-          // 4. Send to Anki
-          const results = await addNotesToAnki(notes, config.url);
+          // 4. Pre-check for duplicates (This avoids the "cannot create note because it is a duplicate" error)
+          const canAddResults = await canAddNotes(notesPayload, config.url);
+          
+          // Filter notes that are safe to add
+          const notesToActuallyAdd = notesPayload.filter((_, index) => canAddResults[index]);
+          const skippedCount = notesPayload.length - notesToActuallyAdd.length;
+
+          if (notesToActuallyAdd.length === 0) {
+              setSyncStatus('success');
+              showToast(`没有发现新卡片 (自动跳过 ${skippedCount} 个重复单词)`, 'info');
+              return;
+          }
+
+          // 5. Send only valid notes to Anki
+          const results = await addNotesToAnki(notesToActuallyAdd, config.url);
           const successCount = results.filter(r => r !== null).length;
-          const duplicateCount = results.length - successCount;
           
           setSyncStatus('success');
-          showToast(`同步完成: 新增 ${successCount}, 重复/忽略 ${duplicateCount}`, 'success');
+          showToast(`同步完成: 新增 ${successCount} (跳过 ${skippedCount} 个重复)`, 'success');
       } catch (e: any) {
           console.error(e);
           setSyncStatus('fail');

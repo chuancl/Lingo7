@@ -191,7 +191,7 @@ const App: React.FC = () => {
                 </section>
 
                 <section id="anki" className="scroll-mt-8">
-                  <AnkiSection config={ankiConfig} setConfig={setAnkiConfig} />
+                  <AnkiSection config={ankiConfig} setConfig={setAnkiConfig} entries={entries} setEntries={setEntries} />
                 </section>
              </div>
           )}

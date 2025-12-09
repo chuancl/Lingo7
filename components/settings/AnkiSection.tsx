@@ -3,7 +3,6 @@ import React, { useState, useMemo } from 'react';
 import { AnkiConfig, WordEntry, WordCategory } from '../../types';
 import { RefreshCw, Wifi, Info, PlusCircle, ChevronDown, Layers, Calendar, Code, Eye, BookOpen, X, Copy } from 'lucide-react';
 import { pingAnki, addNotesToAnki, getCardsInfo } from '../../utils/anki-client';
-import { entriesStorage } from '../../utils/storage';
 import { Toast, ToastMessage } from '../ui/Toast';
 
 const Tooltip: React.FC<{ text: string; children: React.ReactNode }> = ({ text, children }) => {
@@ -21,9 +20,11 @@ const Tooltip: React.FC<{ text: string; children: React.ReactNode }> = ({ text, 
 interface AnkiSectionProps {
   config: AnkiConfig;
   setConfig: React.Dispatch<React.SetStateAction<AnkiConfig>>;
+  entries: WordEntry[];
+  setEntries: React.Dispatch<React.SetStateAction<WordEntry[]>>;
 }
 
-export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig }) => {
+export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, entries, setEntries }) => {
   const [activeTemplate, setActiveTemplate] = useState<'front' | 'back'>('front');
   const [showVarHelp, setShowVarHelp] = useState(false);
   
@@ -48,10 +49,6 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig }) =
       partOfSpeech: 'n.',
       
       // Context Data
-      // Scenario: User was reading a Chinese article, and the API translated it.
-      // Source (Chinese): 许多科学发现都是机缘巧合的结果。青霉素的发现是一个改变医学进程的令人高兴的 serendipity (意外机缘)。
-      // Translation (English): Many scientific discoveries are a result of serendipity. The discovery of penicillin was a happy serendipity that changed the course of medicine.
-      
       contextParagraph: '许多科学发现都是机缘巧合的结果。青霉素的发现是一个改变医学进程的令人高兴的 serendipity (意外机缘)。',
       contextParagraphTranslation: 'Many scientific discoveries are a result of serendipity. The discovery of penicillin was a happy serendipity that changed the course of medicine.',
       
@@ -125,33 +122,29 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig }) =
       };
 
       // Helper to split text around the word (Case insensitive)
-      // This is for {{sentence_en_prefix}} etc.
-      // We look at the API Translated text (English)
       const splitAroundWord = (fullText: string, word: string) => {
           if (!fullText) return { a: '', e: '' };
-          // Simple regex split, taking first match
           const idx = fullText.toLowerCase().indexOf(word.toLowerCase());
-          if (idx === -1) return { a: fullText, e: '' }; // Fallback
+          if (idx === -1) return { a: fullText, e: '' };
           return { a: fullText.substring(0, idx), e: fullText.substring(idx + word.length) };
       };
 
       const sEnSplit = splitAroundWord(entry.contextSentenceTranslation || '', entry.text);
       const pEnSplit = splitAroundWord(entry.contextParagraphTranslation || '', entry.text);
 
-      // Audio URLs (Youdao API)
-      // Updated to match user request: direct API call without le=en param, strictly using type=1 (UK) / type=2 (US)
-      // Example target: https://dict.youdao.com/dictvoice?audio=book&type=1
+      // --- Audio URLs Generation (Youdao API) ---
+      // 使用有道词典 API 生成在线音频链接。type=2 为美音，type=1 为英音。
+      // 注意：这里不需要 le=en 参数，直接使用 audio 和 type 即可。
       const audioUsUrl = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(entry.text || '')}&type=2`;
       const audioUkUrl = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(entry.text || '')}&type=1`;
       
-      // Generate Speaker Icon HTML
-      // Inline styles are used to ensure correct rendering in Anki web view and desktop
+      // Speaker Icon SVG
       const speakerIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
 
+      // Generate Interactive Audio Button HTML
+      // 这里的 onclick 逻辑会在 Anki 或 Webview 中执行：查找内部的 audio 元素并播放。
+      // 兼容 Desktop Anki 和 AnkiDroid/AnkiMobile
       const generateAudioHtml = (url: string) => {
-          // Wrap in a span that acts as a button. 
-          // Updated onclick handler to be more robust for Anki's JS environment
-          // Explicitly finding the audio child and playing it.
           return `<span class="audio-btn" style="cursor:pointer; margin-left:4px; vertical-align:middle; color:#3b82f6; display:inline-flex; align-items:center;" onclick="var a=this.querySelector('audio'); if(a){a.currentTime=0;a.play();} event.preventDefault(); event.stopPropagation();" title="点击播放">${speakerIcon}<audio src="${url}" preload="auto"></audio></span>`;
       };
       
@@ -163,7 +156,7 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig }) =
           '{{audio_uk}}': generateAudioHtml(audioUkUrl),
           
           '{{def_cn}}': entry.translation || '',
-          '{{context_meaning}}': entry.translation || '', // Mapping to translation for now
+          '{{context_meaning}}': entry.translation || '',
           
           '{{part_of_speech}}': entry.partOfSpeech || '',
           '{{tags}}': (entry.tags || []).join(', '),
@@ -173,7 +166,6 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig }) =
           '{{dict_example}}': entry.dictionaryExample || '',
           '{{dict_example_trans}}': entry.dictionaryExampleTranslation || '',
           
-          // Context (English Translation from API)
           '{{sentence_en}}': entry.contextSentenceTranslation || '',
           '{{sentence_en_prefix}}': sEnSplit.a,
           '{{sentence_en_suffix}}': sEnSplit.e,
@@ -182,7 +174,6 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig }) =
           '{{paragraph_en_prefix}}': pEnSplit.a,
           '{{paragraph_en_suffix}}': pEnSplit.e,
           
-          // Context (Original Source - Chinese)
           '{{sentence_src}}': entry.contextSentence || '',
           '{{paragraph_src}}': entry.contextParagraph || '',
 
@@ -195,7 +186,6 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig }) =
           '{{video}}': entry.video ? `<video src="${entry.video.url}" controls></video>` : '',
       };
 
-      // Replace longer keys first to prevent partial replacement
       const keys = Object.keys(map).sort((a,b) => b.length - a.length);
       keys.forEach(key => {
           content = content.replace(new RegExp(key, 'g'), map[key]);
@@ -211,8 +201,8 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig }) =
       const modelName = config.modelName || 'Basic';
       setSyncStatus('processing');
       try {
-          const allEntries = await entriesStorage.getValue();
-          const wordsToAdd = allEntries.filter(e => e.category === targetScope);
+          // 直接使用 Props 传递的 entries，避免 Storage 读取延迟问题
+          const wordsToAdd = entries.filter(e => e.category === targetScope);
 
           if (wordsToAdd.length === 0) {
               setSyncStatus('idle'); 
@@ -251,14 +241,16 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig }) =
               showToast("未发现满足自动掌握条件的单词", "info");
               return;
           }
-          const allEntries = await entriesStorage.getValue();
+
           let updatedCount = 0;
           const stripHtml = (html: string) => {
              const div = document.createElement("div");
              div.innerHTML = html;
              return div.textContent || div.innerText || "";
           };
-          const newEntries = allEntries.map(entry => {
+          
+          // 使用 entries prop 进行计算，并调用 setEntries 更新父组件状态
+          const newEntries = entries.map(entry => {
               if (entry.category === WordCategory.KnownWord) return entry;
               const isMastered = cards.some(card => {
                   const frontRaw = card.fields?.Front?.value || "";
@@ -271,8 +263,9 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig }) =
               }
               return entry;
           });
+          
           if (updatedCount > 0) {
-              await entriesStorage.setValue(newEntries);
+              setEntries(newEntries); // 更新父组件状态，父组件会自动保存到 Storage
               setProgressStatus('success');
               showToast(`同步完成: ${updatedCount} 个单词已自动移入“已掌握”`, 'success');
           } else {

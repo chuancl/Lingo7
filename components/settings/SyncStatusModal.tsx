@@ -4,7 +4,7 @@ import { WordEntry, WordCategory, MergeStrategyConfig, WordTab } from '../../typ
 import { WordList } from '../word-manager/WordList';
 import { MergeConfigModal } from '../word-manager/MergeConfigModal';
 import { DEFAULT_MERGE_STRATEGY } from '../../constants';
-import { X, CheckCircle, Download, CheckSquare, Square, Settings2, Search, GraduationCap } from 'lucide-react';
+import { X, CheckCircle, Download, CheckSquare, Square, Settings2, Search, GraduationCap, List } from 'lucide-react';
 import { Toast, ToastMessage } from '../ui/Toast';
 
 interface SyncStatusModalProps {
@@ -15,6 +15,8 @@ interface SyncStatusModalProps {
 }
 
 export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClose, candidates, onConfirm }) => {
+  // 默认定位在“正在学”
+  const [activeTab, setActiveTab] = useState<WordTab>(WordCategory.LearningWord);
   const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -29,7 +31,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
   
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
-  // 默认全选
+  // 默认全选所有候选词（跨页签的全选概念，初始状态全选）
   React.useEffect(() => {
       if (isOpen && candidates.length > 0) {
           setSelectedWords(new Set(candidates.map(c => c.id)));
@@ -43,6 +45,12 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
   // 过滤逻辑 (Hooks must be called unconditionally)
   const filteredEntries = useMemo(() => {
     return candidates.filter(e => {
+      // Tab Filtering
+      if (activeTab !== 'all') {
+          if (e.category !== activeTab) return false;
+      }
+
+      // Search Filtering
       if (searchQuery) {
         const lowerQ = searchQuery.toLowerCase();
         const matchText = e.text.toLowerCase().includes(lowerQ);
@@ -51,7 +59,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
       }
       return true;
     });
-  }, [candidates, searchQuery]);
+  }, [candidates, activeTab, searchQuery]);
 
   // 分组逻辑 (Hooks must be called unconditionally)
   const groupedEntries = useMemo(() => {
@@ -135,6 +143,8 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
       onConfirm(Array.from(selectedWords));
   };
 
+  const getTabLabel = (tab: WordTab) => tab === 'all' ? '所有待同步' : tab;
+
   // Drag handlers for config
   const handleDragStart = (index: number) => setDraggedItemIndex(index);
   const handleDragOver = (e: React.DragEvent, index: number) => {
@@ -198,17 +208,32 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
 
             {/* Toolbar */}
             <div className="border-b border-slate-200 bg-white p-4 space-y-4">
-                {/* Simulated Tabs - Fixed to 'Learning' */}
-                <div className="flex gap-2 pb-2 border-b border-slate-100">
-                    <button className="px-4 py-2 text-sm font-medium rounded-full bg-slate-100 text-slate-400 cursor-not-allowed">
-                        想学习单词
-                    </button>
-                    <button className="px-4 py-2 text-sm font-medium rounded-full bg-red-50 text-red-600 border border-red-100 shadow-sm">
-                        正在学单词 ({candidates.length})
-                    </button>
-                    <button className="px-4 py-2 text-sm font-medium rounded-full bg-slate-100 text-slate-400 cursor-not-allowed">
-                        已掌握单词
-                    </button>
+                {/* Tabs */}
+                <div className="flex gap-2 pb-2 border-b border-slate-100 overflow-x-auto hide-scrollbar">
+                    {/* 我们只展示'想学'和'正在学'，以及'All'，因为'已掌握'通常是同步的目标而非来源 */}
+                    {(['all', WordCategory.WantToLearnWord, WordCategory.LearningWord] as WordTab[]).map((tab) => {
+                        const count = tab === 'all' 
+                            ? candidates.length 
+                            : candidates.filter(c => c.category === tab).length;
+                        
+                        return (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-all flex items-center ${
+                                    activeTab === tab
+                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
+                                    : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'
+                                }`}
+                            >
+                                {tab === 'all' && <List className="w-3.5 h-3.5 mr-2" />}
+                                {getTabLabel(tab)} 
+                                <span className={`ml-2 text-xs py-0.5 px-1.5 rounded-full ${activeTab === tab ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                    {count}
+                                </span>
+                            </button>
+                        );
+                    })}
                 </div>
 
                 <div className="flex flex-wrap gap-4 items-center justify-between">
@@ -254,7 +279,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                     isGroupSelected={isGroupSelected}
                     showConfig={showConfig}
                     mergeConfig={mergeConfig}
-                    isAllWordsTab={false}
+                    isAllWordsTab={activeTab === 'all'}
                     searchQuery={searchQuery}
                 />
             </div>

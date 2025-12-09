@@ -120,8 +120,8 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
           case 'fail': return `${base} bg-red-600 text-white hover:bg-red-700 border-transparent shadow-red-200 ${extraClasses}`;
           case 'processing':
           case 'testing': return `${base} bg-blue-600 text-white opacity-80 cursor-wait border-transparent ${extraClasses}`;
-          default: return `${base} bg-blue-600 text-white hover:bg-blue-700 border-transparent shadow-blue-200 ${extraClasses}`;
       }
+      return `${base} bg-blue-600 text-white hover:bg-blue-700 border-transparent shadow-blue-200 ${extraClasses}`;
   };
 
   const handleTestConnection = async () => {
@@ -140,7 +140,6 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
   const generateCardContent = (entry: WordEntry, template: string) => {
       let content = template;
       
-      // Helper to generate HTML lists
       const generateListHtml = (items: {text: string, trans: string}[], title: string) => {
           if (!items || items.length === 0) return '';
           return `<div class="info-list"><b>${title}:</b> <ul>${items.map(i => `<li>${i.text} <span style="opacity:0.7">(${i.trans})</span></li>`).join('')}</ul></div>`;
@@ -150,7 +149,6 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
           return `<div class="info-list"><b>词根:</b> <ul>${roots.map(r => `<li><b>${r.root}</b>: ${r.words.map((w:any) => w.text).join(', ')}</li>`).join('')}</ul></div>`;
       };
 
-      // Helper to split text around the word (Case insensitive)
       const splitAroundWord = (fullText: string, word: string) => {
           if (!fullText) return { a: '', e: '' };
           const idx = fullText.toLowerCase().indexOf(word.toLowerCase());
@@ -161,7 +159,6 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
       const sEnSplit = splitAroundWord(entry.contextSentenceTranslation || '', entry.text);
       const pEnSplit = splitAroundWord(entry.contextParagraphTranslation || '', entry.text);
 
-      // --- Audio URLs Generation (Youdao API) ---
       const audioUsUrl = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(entry.text || '')}&type=2`;
       const audioUkUrl = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(entry.text || '')}&type=1`;
       
@@ -177,34 +174,26 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
           '{{phonetic_uk}}': entry.phoneticUk || '',
           '{{audio_us}}': generateAudioHtml(audioUsUrl),
           '{{audio_uk}}': generateAudioHtml(audioUkUrl),
-          
           '{{def_cn}}': entry.translation || '',
           '{{context_meaning}}': entry.translation || '',
-          
           '{{part_of_speech}}': entry.partOfSpeech || '',
           '{{tags}}': (entry.tags || []).join(', '),
           '{{collins_star}}': entry.importance ? '★'.repeat(entry.importance) : '',
           '{{coca_rank}}': entry.cocaRank ? `#${entry.cocaRank}` : '',
-          
           '{{dict_example}}': entry.dictionaryExample || '',
           '{{dict_example_trans}}': entry.dictionaryExampleTranslation || '',
-          
           '{{sentence_en}}': entry.contextSentenceTranslation || '',
           '{{sentence_en_prefix}}': sEnSplit.a,
           '{{sentence_en_suffix}}': sEnSplit.e,
-          
           '{{paragraph_en}}': entry.contextParagraphTranslation || '',
           '{{paragraph_en_prefix}}': pEnSplit.a,
           '{{paragraph_en_suffix}}': pEnSplit.e,
-          
           '{{sentence_src}}': entry.contextSentence || '',
           '{{paragraph_src}}': entry.contextParagraph || '',
-
           '{{roots}}': generateRootsHtml(entry.roots || []),
           '{{synonyms}}': generateListHtml(entry.synonyms || [], '近义词'),
           '{{phrases}}': generateListHtml(entry.phrases || [], '短语'),
           '{{inflections}}': (entry.inflections || []).join(', '),
-          
           '{{image}}': entry.image ? `<img src="${entry.image}">` : '',
           '{{video}}': entry.video ? `<video src="${entry.video.url}" controls></video>` : '',
       };
@@ -217,7 +206,6 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
   };
 
   const handleAddCards = async () => {
-      // Validation
       if (!config.deckNameWant || !config.deckNameLearning) {
           showToast("请先配置完整的牌组名称", "error");
           return;
@@ -229,7 +217,6 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
 
       setSyncStatus('processing');
       try {
-          // 1. Prepare Data for Both Categories
           const wantWords = entries.filter(e => e.category === WordCategory.WantToLearnWord);
           const learningWords = entries.filter(e => e.category === WordCategory.LearningWord);
 
@@ -239,7 +226,6 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
               return;
           }
 
-          // 2. Check and Create Model/Decks
           const TARGET_MODEL_NAME = "ContextLingo-Basic";
           
           const [existingModels, existingDecks] = await Promise.all([
@@ -252,7 +238,6 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
               setConfig(prev => ({ ...prev, modelName: TARGET_MODEL_NAME }));
           }
 
-          // Ensure both decks exist
           const decksToCreate = [];
           if (!existingDecks.includes(config.deckNameWant)) decksToCreate.push(createDeck(config.deckNameWant, config.url));
           if (!existingDecks.includes(config.deckNameLearning)) decksToCreate.push(createDeck(config.deckNameLearning, config.url));
@@ -261,7 +246,6 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
               await Promise.all(decksToCreate);
           }
 
-          // 3. Helper to process a batch
           const processBatch = async (words: WordEntry[], deckName: string) => {
               if (words.length === 0) return { added: 0, skipped: 0 };
 
@@ -287,7 +271,6 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
               return { added: 0, skipped: skippedCount };
           };
 
-          // 4. Process Both Batches
           const [wantResult, learningResult] = await Promise.all([
               processBatch(wantWords, config.deckNameWant),
               processBatch(learningWords, config.deckNameLearning)
@@ -309,12 +292,21 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
   const handleSyncProgress = async () => {
       setProgressStatus('processing');
       try {
-          const query = `deck:"${config.deckNameLearning}" is:review prop:ivl>=${config.syncInterval}`;
-          const cards = await getCardsInfo(query, config.url);
+          // 1. Prepare queries for BOTH decks
+          const wantQuery = `deck:"${config.deckNameWant}" is:review prop:ivl>=${config.syncInterval}`;
+          const learningQuery = `deck:"${config.deckNameLearning}" is:review prop:ivl>=${config.syncInterval}`;
           
-          if (cards.length === 0) {
+          // 2. Execute parallel requests
+          const [wantCards, learningCards] = await Promise.all([
+              getCardsInfo(wantQuery, config.url),
+              getCardsInfo(learningQuery, config.url)
+          ]);
+          
+          const allCards = [...wantCards, ...learningCards];
+
+          if (allCards.length === 0) {
               setProgressStatus('success'); 
-              showToast("在“正在学”牌组中未发现满足自动掌握条件的单词", "info");
+              showToast("在目标牌组中未发现满足自动掌握条件的单词", "info");
               return;
           }
 
@@ -326,19 +318,30 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
           
           const candidates: WordEntry[] = [];
           
-          // Find entries that match the Anki cards
-          entries.forEach(entry => {
-              if (entry.category === WordCategory.LearningWord) {
-                  const isMastered = cards.some(card => {
+          // 3. Match logic: Check local words against the fetched Anki cards
+          // We check WantToLearn entries against WantCards, and Learning entries against LearningCards
+          
+          const checkMatches = (entriesList: WordEntry[], ankiCards: any[]) => {
+              entriesList.forEach(entry => {
+                  const isMastered = ankiCards.some(card => {
                       const frontRaw = card.fields?.Front?.value || "";
                       const frontText = stripHtml(frontRaw);
+                      // Basic check: does card front contain the word text?
                       return frontText.includes(entry.text); 
                   });
                   if (isMastered) {
                       candidates.push(entry);
                   }
-              }
-          });
+              });
+          };
+
+          // Filter local lists
+          const localWant = entries.filter(e => e.category === WordCategory.WantToLearnWord);
+          const localLearning = entries.filter(e => e.category === WordCategory.LearningWord);
+
+          // Perform matching
+          checkMatches(localWant, wantCards);
+          checkMatches(localLearning, learningCards);
           
           if (candidates.length > 0) {
               setSyncCandidates(candidates);

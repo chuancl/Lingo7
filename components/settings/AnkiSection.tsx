@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { AnkiConfig, WordEntry, WordCategory } from '../../types';
 import { RefreshCw, Wifi, Info, PlusCircle, ChevronDown, Layers, Calendar, Code, Eye, BookOpen, X, Copy } from 'lucide-react';
-import { pingAnki, addNotesToAnki, getCardsInfo, getModelNames, createModel, createDeck } from '../../utils/anki-client';
+import { pingAnki, addNotesToAnki, getCardsInfo, getModelNames, createModel, createDeck, getDeckNames } from '../../utils/anki-client';
 import { Toast, ToastMessage } from '../ui/Toast';
 
 const Tooltip: React.FC<{ text: string; children: React.ReactNode }> = ({ text, children }) => {
@@ -203,18 +203,24 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
               return;
           }
 
-          // 2. Check and Create Model if needed
-          // We define a dedicated model name for this extension to avoid conflicts
+          // 2. Check and Create Model/Deck if needed
           const TARGET_MODEL_NAME = "ContextLingo-Basic";
           
-          const existingModels = await getModelNames(config.url);
+          // 并行获取模型和牌组列表，检查是否存在
+          const [existingModels, existingDecks] = await Promise.all([
+              getModelNames(config.url),
+              getDeckNames(config.url)
+          ]);
+
+          // 如果模型不存在，则创建
           if (!existingModels.includes(TARGET_MODEL_NAME)) {
-              // Automatically create the model if it doesn't exist
               await createModel(TARGET_MODEL_NAME, config.url);
-              // Also ensure deck exists (best effort)
-              await createDeck(config.deckName, config.url);
-              // Update config silently to use the new model for future reference if we were storing it
               setConfig(prev => ({ ...prev, modelName: TARGET_MODEL_NAME }));
+          }
+
+          // 如果牌组不存在，则创建 (修复: 无论模型是否存在，都要检查牌组)
+          if (!existingDecks.includes(config.deckName)) {
+              await createDeck(config.deckName, config.url);
           }
 
           // 3. Create Notes

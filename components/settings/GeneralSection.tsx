@@ -1,12 +1,7 @@
 
-
-
-
-
-
 import React, { useState } from 'react';
 import { AutoTranslateConfig } from '../../types';
-import { ShieldAlert, ShieldCheck, X, Mic2, SplitSquareHorizontal, Scan } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, X, Mic2, SplitSquareHorizontal, Scan, Zap } from 'lucide-react';
 
 interface GeneralSectionProps {
   config: AutoTranslateConfig;
@@ -83,6 +78,33 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ config, setConfi
                 className="sr-only peer" 
               />
               <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+           </label>
+        </div>
+
+        {/* Aggressive Mode Toggle */}
+        <div className="flex items-center justify-between bg-amber-50 p-4 rounded-xl border border-amber-100">
+           <div className="flex items-start gap-3">
+              <div className="bg-white p-2 rounded-lg border border-amber-200 shadow-sm text-amber-600">
+                  <Zap className="w-5 h-5" />
+              </div>
+              <div>
+                  <h3 className="font-bold text-slate-900 flex items-center">
+                      启用激进匹配模式
+                      <span className="ml-2 text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold">New</span>
+                  </h3>
+                  <p className="text-xs text-amber-800/70 mt-1 max-w-md">
+                      当词库中的“精确中文释义”无法在文章中找到时，系统将尝试在线翻译该单词，并通过<b>低阈值模糊匹配 (约20%~30%相似度)</b> 寻找替换目标。可能会有少量误替换。
+                  </p>
+              </div>
+           </div>
+           <label className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={config.aggressiveMode || false} 
+                onChange={e => setConfig({...config, aggressiveMode: e.target.checked})} 
+                className="sr-only peer" 
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
            </label>
         </div>
 

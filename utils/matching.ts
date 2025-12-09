@@ -47,3 +47,64 @@ export const findFuzzyMatches = (sourceText: string, candidates: WordEntry[]): {
     }
     return matches;
 };
+
+/**
+ * Aggressive matching logic.
+ * Checks if any of the dynamic definitions match the source text with a lower threshold (e.g. 20-30% overlap).
+ */
+export const findAggressiveMatches = (sourceText: string, entriesWithDefinitions: { entry: WordEntry, definitions: string[] }[]): { text: string, entry: WordEntry }[] => {
+    const segmenter = new (Intl as any).Segmenter('zh-CN', { granularity: 'word' });
+    const segments = Array.from((segmenter as any).segment(sourceText)).map((s: any) => s.segment as string);
+    
+    // Create candidate strings from source text (single segments and bi-grams/tri-grams for better context)
+    const candidates: string[] = [];
+    segments.forEach((s, i) => {
+        if (/[\u4e00-\u9fa5]/.test(s)) candidates.push(s);
+        // Add bigrams (e.g. "建立" + "了" -> "建立了")
+        if (i < segments.length - 1 && /[\u4e00-\u9fa5]/.test(segments[i]) && /[\u4e00-\u9fa5]/.test(segments[i+1])) {
+            candidates.push(segments[i] + segments[i+1]);
+        }
+    });
+    
+    const uniqueCandidates = [...new Set(candidates)];
+    const matches: { text: string, entry: WordEntry }[] = [];
+
+    for (const seg of uniqueCandidates) {
+        if (seg.length < 2) continue; // Skip single chars to avoid noise in aggressive mode
+
+        for (const item of entriesWithDefinitions) {
+            for (const def of item.definitions) {
+                // Calculate similarity or overlap
+                // Logic: If they share a common substring of length >= 2, consider it a match
+                // Or if one contains the other.
+                
+                let isMatch = false;
+                
+                // 1. Direct Inclusion
+                if (seg.includes(def) || def.includes(seg)) {
+                    isMatch = true;
+                } else {
+                    // 2. Overlap Check (e.g. Def="难以置信", Seg="难以")
+                    // Intersection ratio > 0.3
+                    let intersectionLen = 0;
+                    // Simple LCS-like check or just character overlap count
+                    for (let i = 0; i < seg.length; i++) {
+                        if (def.includes(seg[i])) intersectionLen++;
+                    }
+                    
+                    const ratio = intersectionLen / Math.min(seg.length, def.length);
+                    if (ratio >= 0.3 && intersectionLen >= 2) {
+                        isMatch = true;
+                    }
+                }
+
+                if (isMatch) {
+                    matches.push({ text: seg, entry: item.entry });
+                    break; // Found a match for this entry
+                }
+            }
+        }
+    }
+    
+    return matches;
+};

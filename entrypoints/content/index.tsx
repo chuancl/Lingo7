@@ -1,5 +1,4 @@
 
-
 import ReactDOM from 'react-dom/client';
 import React, { useState, useEffect, useRef } from 'react';
 import { PageWidget } from '../../components/PageWidget';
@@ -9,7 +8,7 @@ import { entriesStorage, pageWidgetConfigStorage, autoTranslateConfigStorage, st
 import { WordEntry, PageWidgetConfig, WordInteractionConfig, WordCategory, AutoTranslateConfig, ModifierKey } from '../../types';
 import { defineContentScript } from 'wxt/sandbox';
 import { createShadowRootUi } from 'wxt/client';
-import { findFuzzyMatches } from '../../utils/matching';
+import { findFuzzyMatches, findAggressiveMatches } from '../../utils/matching';
 import { buildReplacementHtml } from '../../utils/dom-builder';
 import { browser } from 'wxt/browser';
 import { preloadVoices, unlockAudio } from '../../utils/audio';
@@ -296,15 +295,6 @@ const ContentOverlay: React.FC<ContentOverlayProps> = ({
                    break;
                }
           }
-          
-          // Sentence Translation Strategy
-          // Since we cache full paragraph translation, we can't reliably extract specific sentence translation.
-          // We'll fallback to using the whole paragraph translation if sentence-level isn't available, 
-          // or leave it empty if we want to be strict.
-          // For now, let's leave contextSentenceTranslation empty unless we can align, 
-          // OR user can edit it later in Anki. 
-          // But requirement says "Original Sentence translated via API".
-          // If the API translated the whole paragraph, we have the paragraph.
       }
 
       // 2. Video Timestamp
@@ -445,30 +435,6 @@ export default defineContentScript({
         parts.forEach(part => {
              const match = validMatches.find(m => m.text === part);
              if (match) {
-                 const span = document.createElement('span');
-                 span.className = 'context-lingo-word'; 
-                 // Build HTML with data attributes for ID and Original Text
-                 // Note: We inject the HTML string, but React handles attributes via props. 
-                 // Here we are in vanilla DOM territory.
-                 // buildReplacementHtml returns string with data-entry-id and data-original-text
-                 span.innerHTML = buildReplacementHtml(
-                    match.text, 
-                    match.entry.text, 
-                    match.entry.category,
-                    currentStyles,
-                    currentOriginalTextConfig,
-                    match.entry.id
-                 );
-                 
-                 // IMPORTANT: Move the inner elements out to the span, or keep span as wrapper
-                 // buildReplacementHtml creates a wrapper (span/ruby) with the class. 
-                 // So we should append that HTML directly. 
-                 // Wait, span.className is 'context-lingo-word', but buildReplacementHtml returns a wrapper with class 'context-lingo-wrapper' or 'context-lingo-word' internally?
-                 // Let's check utils/dom-builder.ts. It returns a string.
-                 // Actually, buildReplacementHtml puts data-entry-id on the INNER target span.
-                 // So we need to ensure events bubble or we target the inner element.
-                 
-                 // Simpler: Just parse the HTML string into nodes
                  const tempDiv = document.createElement('div');
                  tempDiv.innerHTML = buildReplacementHtml(
                     match.text, 
@@ -565,10 +531,12 @@ export default defineContentScript({
                          const splitPattern = /\s*\|\|\|\s*/;
                          const translatedParts = fullTranslatedText.split(splitPattern);
     
-                         batchRequest.items.forEach((item, index) => {
-                             const translatedPart = translatedParts[index] || ""; 
-                             this.applyTranslation(item.block, item.sourceText, translatedPart);
-                         });
+                         // Process sequentially to allow async aggressive fetching
+                         for (let i = 0; i < batchRequest.items.length; i++) {
+                             const item = batchRequest.items[i];
+                             const translatedPart = translatedParts[i] || ""; 
+                             await this.applyTranslation(item.block, item.sourceText, translatedPart, engine);
+                         }
                     } else {
                         batchRequest.items.forEach(item => item.block.setAttribute('data-context-lingo-scanned', 'error'));
                     }
@@ -580,7 +548,7 @@ export default defineContentScript({
             this.isProcessingQueue = false;
         }
 
-        private applyTranslation(block: HTMLElement, sourceText: string, translatedText: string) {
+        private async applyTranslation(block: HTMLElement, sourceText: string, translatedText: string, engine: any) {
             // CACHE TRANSLATION DATA ON DOM for Context Capture
             block.setAttribute('data-lingo-source', sourceText);
             block.setAttribute('data-lingo-translation', translatedText);
@@ -594,6 +562,7 @@ export default defineContentScript({
                 }
             }
 
+            // 1. Verify existence in translated English text
             const verifiedEntries = currentEntries.filter(entry => {
                 const text = entry.text.toLowerCase();
                 const targetLower = translatedText.toLowerCase();
@@ -609,7 +578,53 @@ export default defineContentScript({
                 return;
             }
 
+            // 2. Standard Fuzzy Matching (using stored translation)
             const replacementCandidates = findFuzzyMatches(sourceText, verifiedEntries);
+            const matchedEntryIds = new Set(replacementCandidates.map(r => r.entry.id));
+
+            // 3. Aggressive Mode Logic (Fetch definitions for missed words)
+            if (currentAutoTranslate.aggressiveMode) {
+                const missedEntries = verifiedEntries.filter(e => !matchedEntryIds.has(e.id));
+                
+                if (missedEntries.length > 0) {
+                    const entriesWithDefs: { entry: WordEntry, definitions: string[] }[] = [];
+                    
+                    // Fetch definitions in parallel
+                    const fetchPromises = missedEntries.map(async (entry) => {
+                        try {
+                            const res = await browser.runtime.sendMessage({
+                                action: 'TRANSLATE_TEXT',
+                                engine: engine,
+                                text: entry.text,
+                                target: 'zh' // Force translate EN word to CN
+                            });
+                            
+                            if (res.success && res.data.Response?.TargetText) {
+                                // Result might be "银行; 岸; 库"
+                                const rawDef = res.data.Response.TargetText;
+                                const defs = rawDef.split(/[,;，；\n]/).map((d: string) => d.trim()).filter((d: string) => d.length > 0);
+                                entriesWithDefs.push({ entry, definitions: defs });
+                            }
+                        } catch (e) {
+                            // ignore individual fail
+                        }
+                    });
+
+                    await Promise.all(fetchPromises);
+
+                    if (entriesWithDefs.length > 0) {
+                        const aggressiveMatches = findAggressiveMatches(sourceText, entriesWithDefs);
+                        
+                        // Merge matches, avoid overlaps if possible (simple append for now, processTextNode sorts by length)
+                        aggressiveMatches.forEach(am => {
+                            // Avoid adding duplicates if multiple aggressive rules matched same segment
+                            if (!replacementCandidates.some(rc => rc.text === am.text)) {
+                                replacementCandidates.push(am);
+                            }
+                        });
+                    }
+                }
+            }
 
             if (replacementCandidates.length > 0) {
                  block.setAttribute('data-context-lingo-scanned', 'true');

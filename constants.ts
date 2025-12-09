@@ -1,114 +1,17 @@
 
-import { StyleConfig, WordCategory, Scenario, TranslationEngine, WordInteractionConfig, PageWidgetConfig, AnkiConfig, OriginalTextConfig, MergeStrategyConfig, AutoTranslateConfig, DictionaryEngine } from './types';
-
-export const DEFAULT_STYLE: StyleConfig = {
-  color: '#000000',
-  backgroundColor: 'transparent',
-  underlineStyle: 'none',
-  underlineColor: '#000000',
-  underlineOffset: '2px',
-  isBold: false,
-  isItalic: false,
-  fontSize: '1em',
-  opacity: 1,
-  densityMode: 'percent',
-  densityValue: 100,
-};
-
-export const DEFAULT_ORIGINAL_TEXT_CONFIG: OriginalTextConfig = {
-  show: true,
-  activeMode: 'horizontal',
-  bracketsTarget: 'original',
-  horizontal: {
-    translationFirst: false, // Original Last
-    wrappers: {
-      translation: { prefix: '', suffix: '' },
-      original: { prefix: '(', suffix: ')' }
-    }
-  },
-  vertical: {
-    translationFirst: true, // Translation Top
-    baselineTarget: 'translation', // Default: English sits on baseline
-    wrappers: {
-      translation: { prefix: '', suffix: '' },
-      original: { prefix: '', suffix: '' }
-    }
-  },
-  style: { ...DEFAULT_STYLE, color: '#94a3b8', fontSize: '0.85em' }
-};
-
-export const DEFAULT_STYLES: Record<WordCategory, StyleConfig> = {
-  [WordCategory.KnownWord]: { ...DEFAULT_STYLE, color: '#15803d' }, 
-  [WordCategory.WantToLearnWord]: { ...DEFAULT_STYLE, color: '#b45309', isBold: true }, 
-  [WordCategory.LearningWord]: { ...DEFAULT_STYLE, color: '#b91c1c', backgroundColor: '#fef2f2', isBold: true }, 
-};
-
-export const INITIAL_SCENARIOS: Scenario[] = [
-  { id: '1', name: '通用英语', isActive: true, isCustom: false },
-  { id: '2', name: '雅思 / 托福', isActive: false, isCustom: false },
-  { id: '3', name: '计算机科学', isActive: false, isCustom: false },
-  { id: '4', name: '旅游出行', isActive: false, isCustom: true },
-];
-
-export const INITIAL_ENGINES: TranslationEngine[] = [
-  { 
-    id: 'tencent', 
-    name: '腾讯翻译君 (Tencent)', 
-    type: 'standard', 
-    isEnabled: true, // Default Enabled
-    appId: '', // SecretId
-    secretKey: '', 
-    endpoint: 'tmt.tencentcloudapi.com',
-    region: 'ap-shanghai',
-    projectId: 0
-  },
-  { id: 'google', name: 'Google 翻译', type: 'standard', isEnabled: false, endpoint: 'https://translation.googleapis.com/language/translate/v2' },
-  { id: 'gemini', name: 'Google Gemini', type: 'ai', isEnabled: false, apiKey: '', model: 'gemini-2.5-flash' },
-  { id: 'deepl', name: 'DeepL API', type: 'standard', isEnabled: false, apiKey: '', endpoint: 'https://api-free.deepl.com/v2/translate' },
-  { id: 'volcengine', name: '字节火山引擎', type: 'standard', isEnabled: false, apiKey: '', secretKey: '' },
-  { id: 'baidu', name: '百度翻译', type: 'standard', isEnabled: false, appId: '', secretKey: '' },
-  { id: 'iflytek', name: '科大讯飞', type: 'standard', isEnabled: false, appId: '', apiKey: '', secretKey: '' },
-  { id: 'custom-mock', name: '模拟翻译 (无需 Key)', type: 'standard', isEnabled: false },
-];
-
-export const INITIAL_DICTIONARIES: DictionaryEngine[] = [
-  { 
-    id: 'youdao', 
-    name: '有道词典 (Youdao)', 
-    endpoint: 'https://dict.youdao.com/jsonapi', 
-    link: 'https://dict.youdao.com/',
-    isEnabled: true, 
-    priority: 1, // Youdao is #1
-    description: '网易出品，数据最全，包含音频、考试等级、柯林斯星级等。'
-  },
-  { 
-    id: 'iciba', 
-    name: '金山词霸 (ICBA)', 
-    endpoint: 'https://dict-co.iciba.com/api/dictionary.php',
-    link: 'http://www.iciba.com/',
-    isEnabled: true, 
-    priority: 2, // ICBA is #2
-    description: '经典词典，包含英/美音标及双语例句。'
-  },
-  { 
-    id: 'free-dict', 
-    name: 'Free Dictionary API', 
-    endpoint: 'https://api.dictionaryapi.dev/api/v2/entries/en/', 
-    link: 'https://dictionaryapi.dev/',
-    isEnabled: true, 
-    priority: 3,
-    description: 'Google 官方推荐，英文释义为主。'
-  },
-  { 
-    id: 'wiktionary', 
-    name: 'Wiktionary API', 
-    endpoint: 'https://en.wiktionary.org/api/rest_v1/page/definition/', 
-    link: 'https://en.wiktionary.org/',
-    isEnabled: true, 
-    priority: 4,
-    description: '维基词典，纯英文释义，国内访问不稳定。'
-  }
-];
+import { 
+  WordInteractionConfig, 
+  PageWidgetConfig, 
+  AutoTranslateConfig, 
+  AnkiConfig, 
+  MergeStrategyConfig,
+  WordCategory,
+  StyleConfig,
+  OriginalTextConfig,
+  TranslationEngine,
+  DictionaryEngine,
+  Scenario
+} from './types';
 
 export const DEFAULT_WORD_INTERACTION: WordInteractionConfig = {
   mainTrigger: { modifier: 'None', action: 'Hover', delay: 600 },
@@ -127,7 +30,6 @@ export const DEFAULT_WORD_INTERACTION: WordInteractionConfig = {
 
 export const DEFAULT_PAGE_WIDGET: PageWidgetConfig = {
   enabled: true,
-  // Set to 0 to indicate uninitialized position, triggering auto-position logic in component
   x: 0, 
   y: 0,
   width: 380,
@@ -136,7 +38,7 @@ export const DEFAULT_PAGE_WIDGET: PageWidgetConfig = {
   backgroundColor: '#ffffff',
   fontSize: '14px',
   
-  modalPosition: { x: 0, y: 0 }, // Will also auto-center
+  modalPosition: { x: 0, y: 0 },
   modalSize: { width: 500, height: 600 },
 
   showPhonetic: true,
@@ -147,7 +49,6 @@ export const DEFAULT_PAGE_WIDGET: PageWidgetConfig = {
   showContextTranslation: true,
   showInflections: true,
 
-  // New Fields for Rich Metadata in Widget
   showPartOfSpeech: true,
   showTags: true,
   showImportance: true,
@@ -169,7 +70,8 @@ export const DEFAULT_AUTO_TRANSLATE: AutoTranslateConfig = {
   enabled: true,
   bilingualMode: false,
   translateWholePage: false,
-  matchInflections: true, // Default Enabled
+  matchInflections: true,
+  aggressiveMode: false,
   blacklist: ['google.com', 'baidu.com'], 
   whitelist: ['nytimes.com', 'medium.com'],
   ttsSpeed: 1.0,
@@ -330,7 +232,7 @@ export const DEFAULT_ANKI_CONFIG: AnkiConfig = {
   url: 'http://127.0.0.1:8765',
   deckNameWant: 'ContextLingo-Want',
   deckNameLearning: 'ContextLingo-Learning',
-  modelName: 'Basic', // Default Note Type
+  modelName: 'Basic', 
   syncInterval: 90,
   autoSync: false,
   syncScope: { wantToLearn: true, learning: true },
@@ -361,3 +263,92 @@ export const DEFAULT_MERGE_STRATEGY: MergeStrategyConfig = {
     { id: 'inflections', label: '词态变化 (Morphology)', enabled: true },
   ],
 };
+
+export const DEFAULT_STYLES: Record<WordCategory, StyleConfig> = {
+  [WordCategory.WantToLearnWord]: {
+    color: '#3b82f6', // blue-500
+    backgroundColor: 'transparent',
+    isBold: false,
+    isItalic: false,
+    underlineStyle: 'solid',
+    underlineColor: '#3b82f6',
+    underlineOffset: '2px',
+    fontSize: '1em',
+    densityMode: 'count',
+    densityValue: 10
+  },
+  [WordCategory.LearningWord]: {
+    color: '#ef4444', // red-500
+    backgroundColor: 'transparent',
+    isBold: false,
+    isItalic: false,
+    underlineStyle: 'solid',
+    underlineColor: '#ef4444',
+    underlineOffset: '2px',
+    fontSize: '1em',
+    densityMode: 'count',
+    densityValue: 10
+  },
+  [WordCategory.KnownWord]: {
+    color: '#10b981', // emerald-500
+    backgroundColor: 'transparent',
+    isBold: false,
+    isItalic: false,
+    underlineStyle: 'dashed',
+    underlineColor: '#10b981',
+    underlineOffset: '2px',
+    fontSize: '1em',
+    densityMode: 'count',
+    densityValue: 5
+  }
+};
+
+export const DEFAULT_ORIGINAL_TEXT_CONFIG: OriginalTextConfig = {
+  show: true,
+  style: {
+      color: '#94a3b8',
+      backgroundColor: 'transparent',
+      isBold: false,
+      isItalic: false,
+      underlineStyle: 'none',
+      underlineColor: 'transparent',
+      underlineOffset: '0px',
+      fontSize: '0.9em',
+      densityMode: 'count',
+      densityValue: 0
+  }, 
+  activeMode: 'horizontal',
+  horizontal: {
+      translationFirst: true,
+      wrappers: {
+          translation: { prefix: '', suffix: '' },
+          original: { prefix: '(', suffix: ')' }
+      }
+  },
+  vertical: {
+      translationFirst: true,
+      baselineTarget: 'original',
+      wrappers: {
+          translation: { prefix: '', suffix: '' },
+          original: { prefix: '', suffix: '' }
+      }
+  }
+};
+
+export const INITIAL_ENGINES: TranslationEngine[] = [
+    { id: 'tencent', name: '腾讯交互翻译 (TMT)', type: 'standard', isEnabled: false, isCustom: false, endpoint: 'tmt.tencentcloudapi.com', region: 'ap-shanghai', projectId: 0 },
+    { id: 'google', name: 'Google Translate', type: 'standard', isEnabled: true, isCustom: false },
+    { id: 'openai', name: 'OpenAI (GPT-4)', type: 'ai', isEnabled: false, isCustom: false, model: 'gpt-4' }
+];
+
+export const INITIAL_SCENARIOS: Scenario[] = [
+    { id: '1', name: '默认场景 (General)', isActive: true, isCustom: false },
+    { id: '2', name: 'TOEFL 考试', isActive: false, isCustom: false },
+    { id: '3', name: '商务英语', isActive: false, isCustom: false },
+    { id: '4', name: '日常口语', isActive: false, isCustom: false }
+];
+
+export const INITIAL_DICTIONARIES: DictionaryEngine[] = [
+    { id: 'youdao', name: '有道词典 (Youdao)', link: 'https://dict.youdao.com', description: '提供丰富的柯林斯释义、词组、同近义词及视频讲解。', isEnabled: true, priority: 1 },
+    { id: 'iciba', name: '金山词霸 (Iciba)', link: 'https://www.iciba.com', description: '经典老牌词典，释义准确。', isEnabled: true, priority: 2 }
+];

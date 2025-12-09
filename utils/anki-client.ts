@@ -34,6 +34,36 @@ export const getDeckNames = async (baseUrl: string): Promise<string[]> => {
     return invokeAnki<string[]>('deckNames', {}, baseUrl);
 };
 
+export const createDeck = async (deck: string, baseUrl: string) => {
+    return invokeAnki<number>('createDeck', { deck }, baseUrl);
+};
+
+export const createModel = async (modelName: string, baseUrl: string) => {
+    // Create a standard Basic model structure
+    // Since our app generates full HTML in the fields, the template here can be minimal.
+    return invokeAnki('createModel', {
+        modelName,
+        inOrderFields: ["Front", "Back"],
+        css: `.card {
+ font-family: arial;
+ font-size: 20px;
+ text-align: center;
+ color: black;
+ background-color: white;
+}
+/* Adjustments for ContextLingo generated content */
+img { max-width: 100%; }
+`,
+        cardTemplates: [
+            {
+                Name: "Card 1",
+                Front: "{{Front}}",
+                Back: "{{FrontSide}}\n\n<hr id=answer>\n\n{{Back}}"
+            }
+        ]
+    }, baseUrl);
+};
+
 export const addNotesToAnki = async (notes: any[], baseUrl: string) => {
     // 'addNotes' action takes an array of notes
     return invokeAnki<(number | null)[]>('addNotes', { notes }, baseUrl);

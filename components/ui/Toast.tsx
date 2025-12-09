@@ -57,8 +57,9 @@ export const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
   const currentStyle = styles[toast.type];
 
   return (
-    <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 z-[9999] animate-in slide-in-from-bottom-5 fade-in duration-300 pointer-events-none">
-      <div className={`bg-white px-6 py-4 rounded-lg shadow-2xl shadow-slate-400/20 flex items-center gap-4 min-w-[300px] max-w-lg border border-slate-100 ${currentStyle.border} pointer-events-auto`}>
+    // 使用 Flex 居中代替 absolute + transform，避免与 animate-in 冲突导致的跳动
+    <div className="fixed bottom-10 left-0 right-0 z-[9999] flex justify-center pointer-events-none">
+      <div className={`bg-white px-6 py-4 rounded-lg shadow-2xl shadow-slate-400/20 flex items-center gap-4 min-w-[300px] max-w-lg border border-slate-100 ${currentStyle.border} pointer-events-auto animate-in slide-in-from-bottom-5 fade-in duration-300`}>
         <div className={`shrink-0 ${currentStyle.iconColor}`}>
             {React.cloneElement(currentStyle.icon as any, { className: "w-5 h-5" })}
         </div>

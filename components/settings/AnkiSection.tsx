@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AnkiConfig, WordEntry, WordCategory } from '../../types';
-import { RefreshCw, Wifi, Info, PlusCircle, Layers, Calendar, Code, Eye, BookOpen, X, Copy, Lock, Unlock } from 'lucide-react';
+import { RefreshCw, Wifi, Info, PlusCircle, Layers, Calendar, Code, Eye, BookOpen, X, Copy, Lock, Unlock, AlertCircle } from 'lucide-react';
 import { pingAnki, addNotesToAnki, getCardsInfo, getModelNames, createModel, createDeck, getDeckNames, canAddNotes } from '../../utils/anki-client';
 import { Toast, ToastMessage } from '../ui/Toast';
 import { SyncStatusModal } from './SyncStatusModal';
@@ -32,7 +32,7 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
   // Status States
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'fail'>('idle');
   const [syncStatus, setSyncStatus] = useState<'idle' | 'processing' | 'success' | 'fail'>('idle');
-  const [progressStatus, setProgressStatus] = useState<'idle' | 'processing' | 'success' | 'fail'>('idle');
+  const [progressStatus, setProgressStatus] = useState<'idle' | 'processing' | 'success' | 'fail' | 'warning'>('idle');
   
   // Sync Modal State
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
@@ -117,6 +117,7 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
       const base = "rounded-lg text-sm font-bold flex items-center justify-center transition border shadow-sm h-[38px] px-4 whitespace-nowrap";
       switch (status) {
           case 'success': return `${base} bg-emerald-600 text-white hover:bg-emerald-700 border-transparent shadow-emerald-200 ${extraClasses}`;
+          case 'warning': return `${base} bg-amber-500 text-white hover:bg-amber-600 border-transparent shadow-amber-200 ${extraClasses}`;
           case 'fail': return `${base} bg-red-600 text-white hover:bg-red-700 border-transparent shadow-red-200 ${extraClasses}`;
           case 'processing':
           case 'testing': return `${base} bg-blue-600 text-white opacity-80 cursor-wait border-transparent ${extraClasses}`;
@@ -305,7 +306,7 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
           const allCards = [...wantCards, ...learningCards];
 
           if (allCards.length === 0) {
-              setProgressStatus('success'); 
+              setProgressStatus('warning'); // Use warning for "No data found"
               showToast("在目标牌组中未发现满足自动掌握条件的单词", "info");
               return;
           }
@@ -348,7 +349,7 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
               setIsSyncModalOpen(true);
               setProgressStatus('success');
           } else {
-              setProgressStatus('success');
+              setProgressStatus('warning'); // Use warning if cards found in Anki but don't match local words
               showToast("没有单词需要更新状态 (本地列表与Anki匹配项为空)", "info");
           }
       } catch (e: any) {
@@ -545,7 +546,7 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
 
                        {/* Fetch Button */}
                        <button onClick={handleSyncProgress} disabled={progressStatus === 'processing'} className={getButtonClass(progressStatus, "flex-1 h-[38px]")}>
-                           {progressStatus === 'processing' ? <RefreshCw className="w-4 h-4 animate-spin mr-2"/> : <RefreshCw className="w-4 h-4 mr-2"/>} 获取状态
+                           {progressStatus === 'processing' ? <RefreshCw className="w-4 h-4 animate-spin mr-2"/> : progressStatus === 'warning' ? <AlertCircle className="w-4 h-4 mr-2"/> : <RefreshCw className="w-4 h-4 mr-2"/>} 获取状态
                        </button>
                    </div>
                </div>

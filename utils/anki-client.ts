@@ -26,6 +26,14 @@ export const pingAnki = async (baseUrl: string): Promise<string> => {
     return invokeAnki<string>('version', {}, baseUrl);
 };
 
+export const getModelNames = async (baseUrl: string): Promise<string[]> => {
+    return invokeAnki<string[]>('modelNames', {}, baseUrl);
+};
+
+export const getDeckNames = async (baseUrl: string): Promise<string[]> => {
+    return invokeAnki<string[]>('deckNames', {}, baseUrl);
+};
+
 export const addNotesToAnki = async (notes: any[], baseUrl: string) => {
     // 'addNotes' action takes an array of notes
     return invokeAnki<(number | null)[]>('addNotes', { notes }, baseUrl);

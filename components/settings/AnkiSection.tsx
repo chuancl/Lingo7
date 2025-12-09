@@ -35,16 +35,29 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
   
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
-  // Deck Name Unlock Logic (Easter Egg)
-  const [deckUnlockCount, setDeckUnlockCount] = useState(0);
-  const isDeckUnlocked = deckUnlockCount >= 6;
+  // Deck Name Unlock Logic (Easter Egg) - Independent counters
+  const [wantUnlockCount, setWantUnlockCount] = useState(0);
+  const [learningUnlockCount, setLearningUnlockCount] = useState(0);
 
-  const handleDeckInputClick = () => {
-      if (!isDeckUnlocked) {
-          const newCount = deckUnlockCount + 1;
-          setDeckUnlockCount(newCount);
+  const isWantUnlocked = wantUnlockCount >= 6;
+  const isLearningUnlocked = learningUnlockCount >= 6;
+
+  const handleWantInputClick = () => {
+      if (!isWantUnlocked) {
+          const newCount = wantUnlockCount + 1;
+          setWantUnlockCount(newCount);
           if (newCount === 6) {
-              showToast("高级模式：已解锁牌组名称编辑", "success");
+              showToast("已解锁“想学习”牌组名称编辑", "success");
+          }
+      }
+  };
+
+  const handleLearningInputClick = () => {
+      if (!isLearningUnlocked) {
+          const newCount = learningUnlockCount + 1;
+          setLearningUnlockCount(newCount);
+          if (newCount === 6) {
+              showToast("已解锁“正在学”牌组名称编辑", "success");
           }
       }
   };
@@ -424,14 +437,14 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
                                <input 
                                     type="text" 
                                     value={config.deckNameWant} 
-                                    readOnly={!isDeckUnlocked}
-                                    onClick={handleDeckInputClick}
+                                    readOnly={!isWantUnlocked}
+                                    onClick={handleWantInputClick}
                                     onChange={e => setConfig({...config, deckNameWant: e.target.value})} 
-                                    className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${isDeckUnlocked ? 'bg-white border-slate-300' : 'bg-slate-100 border-slate-200 text-slate-500 cursor-pointer hover:bg-slate-50'}`}
+                                    className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${isWantUnlocked ? 'bg-white border-slate-300' : 'bg-slate-100 border-slate-200 text-slate-500 cursor-pointer hover:bg-slate-50'}`}
                                     placeholder="ContextLingo-Want"
                                />
-                               {!isDeckUnlocked && <Lock className="w-3 h-3 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />}
-                               {isDeckUnlocked && <Unlock className="w-3 h-3 text-green-500 absolute right-3 top-1/2 -translate-y-1/2" />}
+                               {!isWantUnlocked && <Lock className="w-3 h-3 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />}
+                               {isWantUnlocked && <Unlock className="w-3 h-3 text-green-500 absolute right-3 top-1/2 -translate-y-1/2" />}
                            </div>
                        </div>
 
@@ -442,14 +455,14 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
                                 <input 
                                     type="text" 
                                     value={config.deckNameLearning} 
-                                    readOnly={!isDeckUnlocked}
-                                    onClick={handleDeckInputClick}
+                                    readOnly={!isLearningUnlocked}
+                                    onClick={handleLearningInputClick}
                                     onChange={e => setConfig({...config, deckNameLearning: e.target.value})} 
-                                    className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${isDeckUnlocked ? 'bg-white border-slate-300' : 'bg-slate-100 border-slate-200 text-slate-500 cursor-pointer hover:bg-slate-50'}`}
+                                    className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${isLearningUnlocked ? 'bg-white border-slate-300' : 'bg-slate-100 border-slate-200 text-slate-500 cursor-pointer hover:bg-slate-50'}`}
                                     placeholder="ContextLingo-Learning"
                                 />
-                                {!isDeckUnlocked && <Lock className="w-3 h-3 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />}
-                                {isDeckUnlocked && <Unlock className="w-3 h-3 text-green-500 absolute right-3 top-1/2 -translate-y-1/2" />}
+                                {!isLearningUnlocked && <Lock className="w-3 h-3 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />}
+                                {isLearningUnlocked && <Unlock className="w-3 h-3 text-green-500 absolute right-3 top-1/2 -translate-y-1/2" />}
                            </div>
                        </div>
                        

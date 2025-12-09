@@ -291,13 +291,6 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
   const handleSyncProgress = async () => {
       setProgressStatus('processing');
       try {
-          // Need to check both decks for progress
-          // Note: Current logic assumes mastering based on interval. 
-          // We check the "Learning" deck primarily for mastery, or both? 
-          // Usually words move from Want -> Learning -> Mastered. 
-          // So we should verify cards in "Learning" deck mostly. 
-          // But to be safe, let's query the specific deck configured for "Learning".
-          
           const query = `deck:"${config.deckNameLearning}" is:review prop:ivl>=${config.syncInterval}`;
           const cards = await getCardsInfo(query, config.url);
           
@@ -411,21 +404,22 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
                    </button>
                </div>
                
-               {/* New Deck Settings */}
+               {/* Export Settings */}
                <div className="lg:col-span-7 bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col gap-4">
                    <div className="flex items-center">
                         <h3 className="font-bold text-slate-800 text-sm flex items-center mr-2">
                             <Layers className="w-4 h-4 mr-2 text-blue-600" />新增牌组 (Export)
                         </h3>
                         <Tooltip text="将单词分别导出到 Anki。两个牌组名称不可相同。连续点击输入框 6 次可解锁编辑。">
-                            <Info className="w-3.5 h-3.5 text-blue-600 cursor-help" />
+                            <Info className="w-4 h-4 text-slate-400 hover:text-blue-600 cursor-help transition-colors" />
                         </Tooltip>
                    </div>
                    
-                   <div className="grid grid-cols-1 gap-4">
-                       {/* Deck 1: Want to Learn */}
-                       <div className="relative">
-                           <label className="block text-xs text-slate-500 mb-1">目标牌组（想学习的单词）</label>
+                   {/* Single Row for Inputs and Button */}
+                   <div className="flex items-end gap-3">
+                       {/* Deck 1 */}
+                       <div className="flex-1">
+                           <label className="block text-xs text-slate-500 mb-1">目标牌组（想学习）</label>
                            <div className="relative">
                                <input 
                                     type="text" 
@@ -441,28 +435,27 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
                            </div>
                        </div>
 
-                       {/* Deck 2: Learning */}
-                       <div className="flex gap-3 items-end">
-                           <div className="flex-1">
-                               <label className="block text-xs text-slate-500 mb-1">目标牌组（正在学习的单词）</label>
-                               <div className="relative">
-                                    <input 
-                                        type="text" 
-                                        value={config.deckNameLearning} 
-                                        readOnly={!isDeckUnlocked}
-                                        onClick={handleDeckInputClick}
-                                        onChange={e => setConfig({...config, deckNameLearning: e.target.value})} 
-                                        className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${isDeckUnlocked ? 'bg-white border-slate-300' : 'bg-slate-100 border-slate-200 text-slate-500 cursor-pointer hover:bg-slate-50'}`}
-                                        placeholder="ContextLingo-Learning"
-                                    />
-                                    {!isDeckUnlocked && <Lock className="w-3 h-3 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />}
-                                    {isDeckUnlocked && <Unlock className="w-3 h-3 text-green-500 absolute right-3 top-1/2 -translate-y-1/2" />}
-                               </div>
+                       {/* Deck 2 */}
+                       <div className="flex-1">
+                           <label className="block text-xs text-slate-500 mb-1">目标牌组（正在学）</label>
+                           <div className="relative">
+                                <input 
+                                    type="text" 
+                                    value={config.deckNameLearning} 
+                                    readOnly={!isDeckUnlocked}
+                                    onClick={handleDeckInputClick}
+                                    onChange={e => setConfig({...config, deckNameLearning: e.target.value})} 
+                                    className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${isDeckUnlocked ? 'bg-white border-slate-300' : 'bg-slate-100 border-slate-200 text-slate-500 cursor-pointer hover:bg-slate-50'}`}
+                                    placeholder="ContextLingo-Learning"
+                                />
+                                {!isDeckUnlocked && <Lock className="w-3 h-3 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />}
+                                {isDeckUnlocked && <Unlock className="w-3 h-3 text-green-500 absolute right-3 top-1/2 -translate-y-1/2" />}
                            </div>
-                           <button onClick={handleAddCards} disabled={syncStatus === 'processing'} className={getButtonClass(syncStatus)}>
-                               {syncStatus === 'processing' ? <RefreshCw className="w-4 h-4 animate-spin mr-2"/> : <PlusCircle className="w-4 h-4 mr-2"/>} 新增
-                           </button>
                        </div>
+                       
+                       <button onClick={handleAddCards} disabled={syncStatus === 'processing'} className={getButtonClass(syncStatus, "h-[38px]")}>
+                           {syncStatus === 'processing' ? <RefreshCw className="w-4 h-4 animate-spin mr-2"/> : <PlusCircle className="w-4 h-4 mr-2"/>} 新增
+                       </button>
                    </div>
                </div>
 
@@ -473,11 +466,11 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
                            <Calendar className="w-4 h-4 mr-2 text-green-600" />进度同步
                        </h3>
                        <Tooltip text="当 Anki 中的卡片复习间隔大于指定天数时，自动将该单词状态设为“已掌握”。">
-                           <Info className="w-3.5 h-3.5 text-blue-600 cursor-help" />
+                           <Info className="w-4 h-4 text-slate-400 hover:text-blue-600 cursor-help transition-colors" />
                        </Tooltip>
                    </div>
 
-                   <div className="flex items-center gap-4 h-full">
+                   <div className="flex items-end gap-3 h-full">
                        {/* Days Input */}
                        <div>
                            <label className="block text-xs text-slate-500 mb-1">自动掌握(天)</label>
@@ -485,26 +478,26 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
                                 type="number" 
                                 value={config.syncInterval} 
                                 onChange={e => setConfig({...config, syncInterval: parseInt(e.target.value)})} 
-                                className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-sm text-center bg-white"
+                                className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-sm text-center bg-white h-[38px]"
                            />
                        </div>
 
-                       {/* Auto Sync Toggle */}
-                       <div className="flex-1 flex flex-col items-center">
-                           <label className="block text-xs text-slate-500 mb-1">自动同步</label>
-                           <label className="relative inline-flex items-center cursor-pointer">
+                       {/* Auto Sync Toggle - Inline Block Style */}
+                       <div className="h-[38px] flex items-center bg-white px-3 border border-slate-300 rounded-lg">
+                           <label className="text-xs text-slate-600 mr-2 cursor-pointer select-none" htmlFor="auto-sync-toggle">自动同步</label>
+                           <label className="relative inline-flex items-center cursor-pointer" id="auto-sync-toggle">
                                 <input 
                                     type="checkbox" 
                                     checked={config.autoSync || false} 
                                     onChange={e => setConfig({...config, autoSync: e.target.checked})} 
                                     className="sr-only peer" 
                                 />
-                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
                            </label>
                        </div>
 
                        {/* Fetch Button */}
-                       <button onClick={handleSyncProgress} disabled={progressStatus === 'processing'} className={getButtonClass(progressStatus, "h-[38px] mt-auto")}>
+                       <button onClick={handleSyncProgress} disabled={progressStatus === 'processing'} className={getButtonClass(progressStatus, "flex-1 h-[38px]")}>
                            {progressStatus === 'processing' ? <RefreshCw className="w-4 h-4 animate-spin mr-2"/> : <RefreshCw className="w-4 h-4 mr-2"/>} 获取状态
                        </button>
                    </div>

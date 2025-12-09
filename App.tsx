@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
@@ -36,23 +35,19 @@ const App: React.FC = () => {
       await seedInitialData();
       
       // Forced Migration for Dictionary Priorities
-      // We want to ensure ICBA is Priority 1 if user hasn't explicitly customized it to be otherwise (hard to detect, so we force update once if logic demands default behavior override)
-      // Actually, since this is a fix requested by user "Now default from Kingsoft", we enforce the constants logic.
       const currentDicts = await dictionariesStorage.getValue();
       const iciba = currentDicts.find(d => d.id === 'iciba');
       
+      let finalDictionaries = currentDicts;
       if (iciba && iciba.priority !== 1) {
-          // Force migration to new default priorities
-          const updatedDicts = currentDicts.map(d => {
+          finalDictionaries = currentDicts.map(d => {
               if (d.id === 'iciba') return { ...d, priority: 1 };
               if (d.id === 'youdao') return { ...d, priority: 2 };
               return d;
           });
-          await dictionariesStorage.setValue(updatedDicts);
-          setDictionaries(updatedDicts);
-      } else {
-           setDictionaries(currentDicts);
+          await dictionariesStorage.setValue(finalDictionaries);
       }
+      setDictionaries(finalDictionaries);
 
       const [s, e, p, a, eng, ank, sty, orig, interact] = await Promise.all([
         scenariosStorage.getValue(),
@@ -66,13 +61,32 @@ const App: React.FC = () => {
         interactionConfigStorage.getValue(),
       ]);
       
+      // Data Migration: Anki Config
+      // Ensure new deck name fields exist if user is upgrading from older version
+      let finalAnkiConfig = ank;
+      if (!finalAnkiConfig.deckNameWant || !finalAnkiConfig.deckNameLearning) {
+          finalAnkiConfig = {
+              ...DEFAULT_ANKI_CONFIG, // Base on current defaults
+              ...ank, // Overlay existing user settings
+              // Ensure critical new fields are populated if missing in 'ank'
+              deckNameWant: ank.deckNameWant || DEFAULT_ANKI_CONFIG.deckNameWant,
+              deckNameLearning: ank.deckNameLearning || DEFAULT_ANKI_CONFIG.deckNameLearning,
+              syncScope: ank.syncScope || DEFAULT_ANKI_CONFIG.syncScope
+          };
+          // Check for legacy 'deckName' field from previous versions and map it if appropriate
+          // casting to any to access potentially existing old property
+          const oldDeckName = (ank as any).deckName;
+          if (oldDeckName && !finalAnkiConfig.deckNameLearning) {
+             finalAnkiConfig.deckNameLearning = oldDeckName;
+          }
+      }
+
       setScenarios(s);
       setEntries(e);
       setPageWidgetConfig(p);
       setAutoTranslate(a);
       setEngines(eng);
-      // setDictionaries(dict); // Handled above with migration
-      setAnkiConfig(ank);
+      setAnkiConfig(finalAnkiConfig);
       setStyles(sty);
       setOriginalTextConfig(orig);
       setInteractionConfig(interact);

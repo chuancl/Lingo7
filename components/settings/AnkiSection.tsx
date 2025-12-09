@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AnkiConfig, WordEntry, WordCategory } from '../../types';
-import { RefreshCw, Wifi, Info, PlusCircle, ChevronDown, Layers, Calendar, Code, Eye, BookOpen, X, Copy } from 'lucide-react';
+import { RefreshCw, Wifi, Info, PlusCircle, Layers, Calendar, Code, Eye, BookOpen, X, Copy, Lock, Unlock } from 'lucide-react';
 import { pingAnki, addNotesToAnki, getCardsInfo, getModelNames, createModel, createDeck, getDeckNames, canAddNotes } from '../../utils/anki-client';
 import { Toast, ToastMessage } from '../ui/Toast';
 
@@ -33,10 +33,21 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
   const [syncStatus, setSyncStatus] = useState<'idle' | 'processing' | 'success' | 'fail'>('idle');
   const [progressStatus, setProgressStatus] = useState<'idle' | 'processing' | 'success' | 'fail'>('idle');
   
-  // Local UI State for Sync Scope Dropdown
-  const [targetScope, setTargetScope] = useState<WordCategory>(WordCategory.WantToLearnWord);
-
   const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  // Deck Name Unlock Logic (Easter Egg)
+  const [deckUnlockCount, setDeckUnlockCount] = useState(0);
+  const isDeckUnlocked = deckUnlockCount >= 6;
+
+  const handleDeckInputClick = () => {
+      if (!isDeckUnlocked) {
+          const newCount = deckUnlockCount + 1;
+          setDeckUnlockCount(newCount);
+          if (newCount === 6) {
+              showToast("高级模式：已解锁牌组名称编辑", "success");
+          }
+      }
+  };
 
   // Mock Data for Preview with ALL Rich Fields
   const previewEntry = useMemo<WordEntry>(() => ({
@@ -188,22 +199,29 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
   };
 
   const handleAddCards = async () => {
-      if (!config.deckName) {
-          showToast("请先配置目标牌组名称 (Deck)", "error");
+      // Validation
+      if (!config.deckNameWant || !config.deckNameLearning) {
+          showToast("请先配置完整的牌组名称", "error");
+          return;
+      }
+      if (config.deckNameWant === config.deckNameLearning) {
+          showToast("两个牌组名称不能相同", "error");
           return;
       }
 
       setSyncStatus('processing');
       try {
-          // 1. Prepare Data
-          const wordsToAdd = entries.filter(e => e.category === targetScope);
-          if (wordsToAdd.length === 0) {
+          // 1. Prepare Data for Both Categories
+          const wantWords = entries.filter(e => e.category === WordCategory.WantToLearnWord);
+          const learningWords = entries.filter(e => e.category === WordCategory.LearningWord);
+
+          if (wantWords.length === 0 && learningWords.length === 0) {
               setSyncStatus('idle'); 
-              showToast(`当前“${targetScope}”列表内没有单词`, "info");
+              showToast(`当前词汇表中没有单词`, "info");
               return;
           }
 
-          // 2. Check and Create Model/Deck if needed
+          // 2. Check and Create Model/Decks
           const TARGET_MODEL_NAME = "ContextLingo-Basic";
           
           const [existingModels, existingDecks] = await Promise.all([
@@ -216,41 +234,53 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
               setConfig(prev => ({ ...prev, modelName: TARGET_MODEL_NAME }));
           }
 
-          if (!existingDecks.includes(config.deckName)) {
-              await createDeck(config.deckName, config.url);
-          }
-
-          // 3. Create Note Objects
-          const notesPayload = wordsToAdd.map(entry => ({
-              deckName: config.deckName,
-              modelName: TARGET_MODEL_NAME, 
-              fields: {
-                  Front: generateCardContent(entry, config.templates.frontTemplate),
-                  Back: generateCardContent(entry, config.templates.backTemplate)
-              },
-              tags: ['ContextLingo', ...(entry.tags || [])],
-              options: { allowDuplicate: false, duplicateScope: "deck" }
-          }));
-
-          // 4. Pre-check for duplicates (This avoids the "cannot create note because it is a duplicate" error)
-          const canAddResults = await canAddNotes(notesPayload, config.url);
+          // Ensure both decks exist
+          const decksToCreate = [];
+          if (!existingDecks.includes(config.deckNameWant)) decksToCreate.push(createDeck(config.deckNameWant, config.url));
+          if (!existingDecks.includes(config.deckNameLearning)) decksToCreate.push(createDeck(config.deckNameLearning, config.url));
           
-          // Filter notes that are safe to add
-          const notesToActuallyAdd = notesPayload.filter((_, index) => canAddResults[index]);
-          const skippedCount = notesPayload.length - notesToActuallyAdd.length;
-
-          if (notesToActuallyAdd.length === 0) {
-              setSyncStatus('success');
-              showToast(`没有发现新卡片 (自动跳过 ${skippedCount} 个重复单词)`, 'info');
-              return;
+          if (decksToCreate.length > 0) {
+              await Promise.all(decksToCreate);
           }
 
-          // 5. Send only valid notes to Anki
-          const results = await addNotesToAnki(notesToActuallyAdd, config.url);
-          const successCount = results.filter(r => r !== null).length;
+          // 3. Helper to process a batch
+          const processBatch = async (words: WordEntry[], deckName: string) => {
+              if (words.length === 0) return { added: 0, skipped: 0 };
+
+              const notesPayload = words.map(entry => ({
+                  deckName: deckName,
+                  modelName: TARGET_MODEL_NAME, 
+                  fields: {
+                      Front: generateCardContent(entry, config.templates.frontTemplate),
+                      Back: generateCardContent(entry, config.templates.backTemplate)
+                  },
+                  tags: ['ContextLingo', ...(entry.tags || [])],
+                  options: { allowDuplicate: false, duplicateScope: "deck" }
+              }));
+
+              const canAddResults = await canAddNotes(notesPayload, config.url);
+              const notesToActuallyAdd = notesPayload.filter((_, index) => canAddResults[index]);
+              const skippedCount = notesPayload.length - notesToActuallyAdd.length;
+
+              if (notesToActuallyAdd.length > 0) {
+                  await addNotesToAnki(notesToActuallyAdd, config.url);
+                  return { added: notesToActuallyAdd.length, skipped: skippedCount };
+              }
+              return { added: 0, skipped: skippedCount };
+          };
+
+          // 4. Process Both Batches
+          const [wantResult, learningResult] = await Promise.all([
+              processBatch(wantWords, config.deckNameWant),
+              processBatch(learningWords, config.deckNameLearning)
+          ]);
+
+          const totalAdded = wantResult.added + learningResult.added;
+          const totalSkipped = wantResult.skipped + learningResult.skipped;
           
           setSyncStatus('success');
-          showToast(`同步完成: 新增 ${successCount} (跳过 ${skippedCount} 个重复)`, 'success');
+          showToast(`同步完成: 新增 ${totalAdded} (想学${wantResult.added}/正在学${learningResult.added}), 跳过 ${totalSkipped}`, 'success');
+
       } catch (e: any) {
           console.error(e);
           setSyncStatus('fail');
@@ -261,11 +291,19 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
   const handleSyncProgress = async () => {
       setProgressStatus('processing');
       try {
-          const query = `deck:"${config.deckName}" is:review prop:ivl>=${config.syncInterval}`;
+          // Need to check both decks for progress
+          // Note: Current logic assumes mastering based on interval. 
+          // We check the "Learning" deck primarily for mastery, or both? 
+          // Usually words move from Want -> Learning -> Mastered. 
+          // So we should verify cards in "Learning" deck mostly. 
+          // But to be safe, let's query the specific deck configured for "Learning".
+          
+          const query = `deck:"${config.deckNameLearning}" is:review prop:ivl>=${config.syncInterval}`;
           const cards = await getCardsInfo(query, config.url);
+          
           if (cards.length === 0) {
               setProgressStatus('success'); 
-              showToast("未发现满足自动掌握条件的单词", "info");
+              showToast("在“正在学”牌组中未发现满足自动掌握条件的单词", "info");
               return;
           }
 
@@ -373,39 +411,100 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
                    </button>
                </div>
                
-               {/* Export Settings */}
+               {/* New Deck Settings */}
                <div className="lg:col-span-7 bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col gap-4">
-                   <h3 className="font-bold text-slate-800 text-sm flex items-center"><Layers className="w-4 h-4 mr-2 text-blue-600" />新增牌组 (Export)</h3>
-                   <div className="flex gap-3 items-end">
-                       <div className="flex-1">
-                           <label className="block text-xs text-slate-500 mb-1">目标牌组 (Deck)</label>
-                           <input type="text" value={config.deckName} onChange={e => setConfig({...config, deckName: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="ContextLingo"/>
-                       </div>
-                       <div className="w-32">
-                           <label className="block text-xs text-slate-500 mb-1">同步范围</label>
+                   <div className="flex items-center">
+                        <h3 className="font-bold text-slate-800 text-sm flex items-center mr-2">
+                            <Layers className="w-4 h-4 mr-2 text-blue-600" />新增牌组 (Export)
+                        </h3>
+                        <Tooltip text="将单词分别导出到 Anki。两个牌组名称不可相同。连续点击输入框 6 次可解锁编辑。">
+                            <Info className="w-3.5 h-3.5 text-blue-600 cursor-help" />
+                        </Tooltip>
+                   </div>
+                   
+                   <div className="grid grid-cols-1 gap-4">
+                       {/* Deck 1: Want to Learn */}
+                       <div className="relative">
+                           <label className="block text-xs text-slate-500 mb-1">目标牌组（想学习的单词）</label>
                            <div className="relative">
-                               <select value={targetScope} onChange={e => setTargetScope(e.target.value as WordCategory)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm appearance-none bg-white pr-8 cursor-pointer">
-                                   <option value={WordCategory.WantToLearnWord}>想学习</option>
-                                   <option value={WordCategory.LearningWord}>正在学</option>
-                               </select>
-                               <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                               <input 
+                                    type="text" 
+                                    value={config.deckNameWant} 
+                                    readOnly={!isDeckUnlocked}
+                                    onClick={handleDeckInputClick}
+                                    onChange={e => setConfig({...config, deckNameWant: e.target.value})} 
+                                    className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${isDeckUnlocked ? 'bg-white border-slate-300' : 'bg-slate-100 border-slate-200 text-slate-500 cursor-pointer hover:bg-slate-50'}`}
+                                    placeholder="ContextLingo-Want"
+                               />
+                               {!isDeckUnlocked && <Lock className="w-3 h-3 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />}
+                               {isDeckUnlocked && <Unlock className="w-3 h-3 text-green-500 absolute right-3 top-1/2 -translate-y-1/2" />}
                            </div>
                        </div>
-                       <button onClick={handleAddCards} disabled={syncStatus === 'processing'} className={getButtonClass(syncStatus)}>
-                           {syncStatus === 'processing' ? <RefreshCw className="w-4 h-4 animate-spin mr-2"/> : <PlusCircle className="w-4 h-4 mr-2"/>} 新增
-                       </button>
+
+                       {/* Deck 2: Learning */}
+                       <div className="flex gap-3 items-end">
+                           <div className="flex-1">
+                               <label className="block text-xs text-slate-500 mb-1">目标牌组（正在学习的单词）</label>
+                               <div className="relative">
+                                    <input 
+                                        type="text" 
+                                        value={config.deckNameLearning} 
+                                        readOnly={!isDeckUnlocked}
+                                        onClick={handleDeckInputClick}
+                                        onChange={e => setConfig({...config, deckNameLearning: e.target.value})} 
+                                        className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${isDeckUnlocked ? 'bg-white border-slate-300' : 'bg-slate-100 border-slate-200 text-slate-500 cursor-pointer hover:bg-slate-50'}`}
+                                        placeholder="ContextLingo-Learning"
+                                    />
+                                    {!isDeckUnlocked && <Lock className="w-3 h-3 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />}
+                                    {isDeckUnlocked && <Unlock className="w-3 h-3 text-green-500 absolute right-3 top-1/2 -translate-y-1/2" />}
+                               </div>
+                           </div>
+                           <button onClick={handleAddCards} disabled={syncStatus === 'processing'} className={getButtonClass(syncStatus)}>
+                               {syncStatus === 'processing' ? <RefreshCw className="w-4 h-4 animate-spin mr-2"/> : <PlusCircle className="w-4 h-4 mr-2"/>} 新增
+                           </button>
+                       </div>
                    </div>
                </div>
 
                {/* Sync Settings */}
                <div className="lg:col-span-5 bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col gap-4">
-                   <h3 className="font-bold text-slate-800 text-sm flex items-center"><Calendar className="w-4 h-4 mr-2 text-green-600" />进度同步</h3>
-                   <div className="flex gap-3 items-end h-full">
+                   <div className="flex items-center">
+                       <h3 className="font-bold text-slate-800 text-sm flex items-center mr-2">
+                           <Calendar className="w-4 h-4 mr-2 text-green-600" />进度同步
+                       </h3>
+                       <Tooltip text="当 Anki 中的卡片复习间隔大于指定天数时，自动将该单词状态设为“已掌握”。">
+                           <Info className="w-3.5 h-3.5 text-blue-600 cursor-help" />
+                       </Tooltip>
+                   </div>
+
+                   <div className="flex items-center gap-4 h-full">
+                       {/* Days Input */}
                        <div>
                            <label className="block text-xs text-slate-500 mb-1">自动掌握(天)</label>
-                           <input type="number" value={config.syncInterval} onChange={e => setConfig({...config, syncInterval: parseInt(e.target.value)})} className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-sm text-center"/>
+                           <input 
+                                type="number" 
+                                value={config.syncInterval} 
+                                onChange={e => setConfig({...config, syncInterval: parseInt(e.target.value)})} 
+                                className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-sm text-center bg-white"
+                           />
                        </div>
-                       <button onClick={handleSyncProgress} disabled={progressStatus === 'processing'} className={getButtonClass(progressStatus, "flex-1")}>
+
+                       {/* Auto Sync Toggle */}
+                       <div className="flex-1 flex flex-col items-center">
+                           <label className="block text-xs text-slate-500 mb-1">自动同步</label>
+                           <label className="relative inline-flex items-center cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    checked={config.autoSync || false} 
+                                    onChange={e => setConfig({...config, autoSync: e.target.checked})} 
+                                    className="sr-only peer" 
+                                />
+                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                           </label>
+                       </div>
+
+                       {/* Fetch Button */}
+                       <button onClick={handleSyncProgress} disabled={progressStatus === 'processing'} className={getButtonClass(progressStatus, "h-[38px] mt-auto")}>
                            {progressStatus === 'processing' ? <RefreshCw className="w-4 h-4 animate-spin mr-2"/> : <RefreshCw className="w-4 h-4 mr-2"/>} 获取状态
                        </button>
                    </div>

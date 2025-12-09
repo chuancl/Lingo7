@@ -328,9 +328,11 @@ const DEFAULT_ANKI_BACK = `
 export const DEFAULT_ANKI_CONFIG: AnkiConfig = {
   enabled: true,
   url: 'http://127.0.0.1:8765',
-  deckName: 'ContextLingo',
+  deckNameWant: 'ContextLingo-Want',
+  deckNameLearning: 'ContextLingo-Learning',
   modelName: 'Basic', // Default Note Type
   syncInterval: 90,
+  autoSync: false,
   syncScope: { wantToLearn: true, learning: true },
   templates: { frontTemplate: DEFAULT_ANKI_FRONT, backTemplate: DEFAULT_ANKI_BACK }
 };

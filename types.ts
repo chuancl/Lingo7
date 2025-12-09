@@ -1,5 +1,4 @@
 
-
 export enum WordCategory {
   KnownWord = '已掌握单词',
   WantToLearnWord = '想学习单词',
@@ -204,9 +203,11 @@ export interface AnkiTemplateConfig {
 export interface AnkiConfig {
   enabled: boolean;
   url: string;
-  deckName: string;
+  deckNameWant: string; // Target deck for "Want to Learn"
+  deckNameLearning: string; // Target deck for "Learning"
   modelName: string; // New: Required for creating notes
   syncInterval: number;
+  autoSync: boolean; // New: Auto sync toggle
   syncScope: {
     wantToLearn: boolean;
     learning: boolean;

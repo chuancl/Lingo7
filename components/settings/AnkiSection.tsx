@@ -4,6 +4,7 @@ import { AnkiConfig, WordEntry, WordCategory } from '../../types';
 import { RefreshCw, Wifi, Info, PlusCircle, Layers, Calendar, Code, Eye, BookOpen, X, Copy, Lock, Unlock } from 'lucide-react';
 import { pingAnki, addNotesToAnki, getCardsInfo, getModelNames, createModel, createDeck, getDeckNames, canAddNotes } from '../../utils/anki-client';
 import { Toast, ToastMessage } from '../ui/Toast';
+import { SyncStatusModal } from './SyncStatusModal';
 
 const Tooltip: React.FC<{ text: string; children: React.ReactNode }> = ({ text, children }) => {
   return (
@@ -33,6 +34,10 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
   const [syncStatus, setSyncStatus] = useState<'idle' | 'processing' | 'success' | 'fail'>('idle');
   const [progressStatus, setProgressStatus] = useState<'idle' | 'processing' | 'success' | 'fail'>('idle');
   
+  // Sync Modal State
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [syncCandidates, setSyncCandidates] = useState<WordEntry[]>([]);
+
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
   // Deck Name Unlock Logic (Easter Egg) - Independent counters
@@ -313,40 +318,56 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
               return;
           }
 
-          let updatedCount = 0;
           const stripHtml = (html: string) => {
              const div = document.createElement("div");
              div.innerHTML = html;
              return div.textContent || div.innerText || "";
           };
           
-          const newEntries = entries.map(entry => {
-              if (entry.category === WordCategory.KnownWord) return entry;
-              const isMastered = cards.some(card => {
-                  const frontRaw = card.fields?.Front?.value || "";
-                  const frontText = stripHtml(frontRaw);
-                  return frontText.includes(entry.text); 
-              });
-              if (isMastered) {
-                  updatedCount++;
-                  return { ...entry, category: WordCategory.KnownWord };
+          const candidates: WordEntry[] = [];
+          
+          // Find entries that match the Anki cards
+          entries.forEach(entry => {
+              if (entry.category === WordCategory.LearningWord) {
+                  const isMastered = cards.some(card => {
+                      const frontRaw = card.fields?.Front?.value || "";
+                      const frontText = stripHtml(frontRaw);
+                      return frontText.includes(entry.text); 
+                  });
+                  if (isMastered) {
+                      candidates.push(entry);
+                  }
               }
-              return entry;
           });
           
-          if (updatedCount > 0) {
-              setEntries(newEntries); 
+          if (candidates.length > 0) {
+              setSyncCandidates(candidates);
+              setIsSyncModalOpen(true);
               setProgressStatus('success');
-              showToast(`同步完成: ${updatedCount} 个单词已自动移入“已掌握”`, 'success');
           } else {
               setProgressStatus('success');
-              showToast("没有单词需要更新状态", "info");
+              showToast("没有单词需要更新状态 (本地列表与Anki匹配项为空)", "info");
           }
       } catch (e: any) {
           console.error(e);
           setProgressStatus('fail');
           showToast(`获取进度失败: ${e.message}`, 'error');
       }
+  };
+
+  const handleApplySync = (selectedIds: string[]) => {
+      if (selectedIds.length === 0) return;
+      
+      const newEntries = entries.map(entry => {
+          if (selectedIds.includes(entry.id)) {
+              return { ...entry, category: WordCategory.KnownWord };
+          }
+          return entry;
+      });
+      
+      setEntries(newEntries);
+      setIsSyncModalOpen(false);
+      showToast(`同步完成: ${selectedIds.length} 个单词已移入“已掌握”`, 'success');
   };
 
   const variables = [
@@ -391,6 +412,14 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
   return (
     <section className="bg-white rounded-xl shadow-sm border border-slate-200 relative">
         <Toast toast={toast} onClose={() => setToast(null)} />
+        
+        {/* Sync Status Confirmation Modal */}
+        <SyncStatusModal 
+            isOpen={isSyncModalOpen} 
+            onClose={() => setIsSyncModalOpen(false)}
+            candidates={syncCandidates}
+            onConfirm={handleApplySync}
+        />
         
         <div className="p-6 border-b border-slate-200">
             <h2 className="text-lg font-bold text-slate-800">Anki 集成</h2>

@@ -36,13 +36,11 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
       }
   }, [isOpen, candidates]);
 
-  if (!isOpen) return null;
-
   const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
       setToast({ id: Date.now(), message, type });
   };
 
-  // 过滤逻辑
+  // 过滤逻辑 (Hooks must be called unconditionally)
   const filteredEntries = useMemo(() => {
     return candidates.filter(e => {
       if (searchQuery) {
@@ -55,7 +53,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
     });
   }, [candidates, searchQuery]);
 
-  // 分组逻辑 (复用 WordManager)
+  // 分组逻辑 (Hooks must be called unconditionally)
   const groupedEntries = useMemo(() => {
     const groups: Record<string, WordEntry[]> = {};
     filteredEntries.forEach(entry => {
@@ -78,6 +76,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
     });
   }, [filteredEntries, mergeConfig.strategy]);
 
+  // Derived variables (not hooks)
   const allVisibleIds = filteredEntries.map(e => e.id);
   const allSelected = allVisibleIds.length > 0 && allVisibleIds.every(id => selectedWords.has(id));
 
@@ -149,6 +148,9 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
     setDraggedItemIndex(index);
   };
   const handleDragEnd = () => setDraggedItemIndex(null);
+
+  // Early Return - Moved AFTER all hooks
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">

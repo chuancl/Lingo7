@@ -413,13 +413,15 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
     <section className="bg-white rounded-xl shadow-sm border border-slate-200 relative">
         <Toast toast={toast} onClose={() => setToast(null)} />
         
-        {/* Sync Status Confirmation Modal */}
-        <SyncStatusModal 
-            isOpen={isSyncModalOpen} 
-            onClose={() => setIsSyncModalOpen(false)}
-            candidates={syncCandidates}
-            onConfirm={handleApplySync}
-        />
+        {/* Sync Status Confirmation Modal - Condition Render to prevent hook error and ensure fresh state */}
+        {isSyncModalOpen && (
+            <SyncStatusModal 
+                isOpen={isSyncModalOpen} 
+                onClose={() => setIsSyncModalOpen(false)}
+                candidates={syncCandidates}
+                onConfirm={handleApplySync}
+            />
+        )}
         
         <div className="p-6 border-b border-slate-200">
             <h2 className="text-lg font-bold text-slate-800">Anki 集成</h2>
